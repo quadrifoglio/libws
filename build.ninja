@@ -1,0 +1,16 @@
+cc = clang
+cflags = -Iinclude -g -Wall -Wextra -Wno-unused-parameter
+
+src = src
+dst = build
+
+rule cc
+  command = $cc -c $cflags -o $out $in
+  description = CC $in
+
+rule ar
+  command = ar rcs $out $in
+  description = AR $in
+
+build $dst/libws.o: cc $src/libws.c
+build $dst/libws.a: ar $dst/libws.o
