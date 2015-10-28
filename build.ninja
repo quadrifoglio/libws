@@ -1,12 +1,21 @@
 cc = clang
 cflags = -Iinclude -g -Wall -Wextra -Wno-unused-parameter
 
+ld = clang
+ldflags = 
+libs = -luv
+
 src = src
+exp = examples
 dst = build
 
 rule cc
   command = $cc -c $cflags -o $out $in
   description = CC $in
+
+rule ld
+  command = $ld $ldflags -o $out $in $libs
+  description = LD $in
 
 rule ar
   command = ar rcs $out $in
@@ -14,3 +23,6 @@ rule ar
 
 build $dst/libws.o: cc $src/libws.c
 build $dst/libws.a: ar $dst/libws.o
+
+build $dst/server.o: cc $exp/server.c
+build $dst/server: ld $dst/server.o $dst/libws.a
