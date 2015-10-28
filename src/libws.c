@@ -43,41 +43,23 @@ int ws_process_handshake(ws_handshake_t* h, char* buf, size_t len) {
 			return WS_ERR_INVALID_REQUEST;
 		}
 
-		char* hostStart = strstr(ss, "Host: ");
-		char* endlStart = strstr(hostStart, "\r\n");
-		if(hostStart == 0 || endlStart == 0) {
+		h->host = wsu_get_header_value("Host: ", ss);
+		if(h->host == 0) {
 			free(ss);
 			return WS_ERR_INVALID_REQUEST;
 		}
 
-		size_t hostLen = endlStart - (hostStart + 5);
-		h->host = (char*)malloc(hostLen + 1);
-		memcpy(h->host, hostStart + 6, hostLen);
-		h->host[hostLen] = '\0';
-
-		char* originStart = strstr(ss, "Origin: ");
-		endlStart = strstr(originStart, "\r\n");
-		if(originStart == 0 || endlStart == 0) {
+		h->origin = wsu_get_header_value("Origin: ", ss);
+		if(h->origin == 0) {
 			free(ss);
 			return WS_ERR_INVALID_REQUEST;
 		}
 
-		size_t originLen = endlStart - (originStart + 7);
-		h->origin = (char*)malloc(originLen + 1);
-		memcpy(h->origin, originStart + 8, originLen);
-		h->origin[originLen] = '\0';
-
-		char* keyStart = strstr(ss, "Sec-WebSocket-Key: ");
-		endlStart = strstr(keyStart, "\r\n");
-		if(keyStart == 0 || endlStart == 0) {
+		h->key = wsu_get_header_value("Sec-WebSocket-Key: ", ss);
+		if(h->key == 0) {
 			free(ss);
 			return WS_ERR_INVALID_REQUEST;
 		}
-
-		size_t keyLen = endlStart - (keyStart + 18);
-		h->key = (char*)malloc(keyLen + 1);
-		memcpy(h->key, keyStart + 19, keyLen);
-		h->key[keyLen] = '\0';
 	}
 	else {
 		free(ss);
@@ -113,4 +95,19 @@ const char* ws_err_name(int r) {
 		default:
 			return "unknown error";
 	}
+}
+
+char* wsu_get_header_value(const char* hd, char* str) {
+	char* start = strstr(str, hd);
+	char* endlStart = strstr(start, "\r\n");
+	if(start == 0 || endlStart == 0) {
+		return 0;
+	}
+
+	size_t len = endlStart - (start + strlen(hd));
+	char* res = (char*)malloc(len + 1);
+	memcpy(res, start + strlen(hd), len);
+	res[len] = '\0';
+
+	return res;
 }

@@ -53,3 +53,5 @@ int ws_process_frame(ws_data_t* data, char* buf, size_t len);
 ws_frame_t ws_create_frame(ws_type_t type, char* buf, size_t len);
 
 const char* ws_err_name(int r);
+
+char* wsu_get_header_value(const char* hd, char* start);
