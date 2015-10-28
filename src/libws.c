@@ -15,7 +15,11 @@ int ws_process_handshake(ws_handshake_t* h, char* buf, size_t len) {
 	memcpy(ss, buf, len);
 	ss[len - 1] = '\0';
 
-	printf("%s\n", ss);
+	h->url = 0;
+	h->host = 0;
+	h->origin = 0;
+	h->key = 0;
+	h->accept = 0;
 
 	char* getStart = strstr(ss, "GET");
 	char* httpStart = strstr(ss, "HTTP/1.1"); // Must be HTTP/1.1 (RFC6455)
@@ -137,13 +141,20 @@ ws_data_t ws_handshake_response(ws_handshake_t* h) {
 }
 
 void ws_handshake_done(ws_handshake_t* h) {
-	free(h->url);
-	free(h->host);
-	free(h->key);
-	free(h->accept);
-
+	if(h->url) {
+		free(h->url);
+	}
+	if(h->host) {
+		free(h->host);
+	}
 	if(h->origin) {
 		free(h->origin);
+	}
+	if(h->key) {
+		free(h->key);
+	}
+	if(h->accept) {
+		free(h->accept);
 	}
 }
 
