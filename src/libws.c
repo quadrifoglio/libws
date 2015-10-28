@@ -15,6 +15,8 @@ int ws_process_handshake(ws_handshake_t* h, char* buf, size_t len) {
 	memcpy(ss, buf, len);
 	ss[len - 1] = '\0';
 
+	printf("%s\n", ss);
+
 	char* getStart = strstr(ss, "GET");
 	char* httpStart = strstr(ss, "HTTP/1.1"); // Must be HTTP/1.1 (RFC6455)
 
@@ -25,8 +27,8 @@ int ws_process_handshake(ws_handshake_t* h, char* buf, size_t len) {
 		memcpy(h->url, (ss + 4), urlLen);
 		h->url[urlLen] = '\0';
 
-		char* connStart = strstr(ss, "Connection: Upgrade");
-		if(connStart == 0) {
+		char* connStart = strstr(ss, "Connection: ");
+		if(connStart == 0 || strstr(connStart, "Upgrade") == 0) {
 			free(ss);
 			return WS_ERR_INVALID_REQUEST;
 		}
@@ -81,6 +83,41 @@ int ws_process_handshake(ws_handshake_t* h, char* buf, size_t len) {
 }
 
 int ws_process_frame(ws_data_t* data, char* buf, size_t len) {
+	int cursor = 0;
+	u8 mask[4];
+
+	bool fin = buf[cursor] & 0x80 >> 7;
+	u8 opcode = buf[cursor] & 0x0f;
+	cursor++;
+
+	bool masked = buf[cursor] & 0x80 >> 7;
+	u8 plen = buf[cursor] & 0x7f;
+	cursor++;
+
+	printf("Size: %lu // Fin: %d // Opcode: %d // Masked: %d // plen(1): %d\n", len, fin, opcode, masked, plen);
+
+	// TODO: Handle plen > 125 
+
+	if(masked && len > (size_t)cursor + 4) {
+		memcpy(mask, buf + cursor, 4);
+		cursor += 4;
+	}
+	else {
+		// Invalid
+	}
+
+	data->base = (u8*)malloc(plen);
+	data->len = plen;
+
+	if(masked) {
+		for(int i = 0; i < plen; ++i) {
+			data->base[i] = (u8)(buf[cursor + i] ^ mask[i % 4]);
+		}
+	}
+	else {
+		memcpy(data->base, buf + cursor, plen);
+	}
+
 	return WS_NO_ERR;
 }
 

@@ -52,7 +52,7 @@ void on_read(uv_stream_t* handle, ssize_t nread, const uv_buf_t* buf) {
 				ws_data_t resp = ws_handshake_response(&h);
 
 				uv_write_t* w = (uv_write_t*)malloc(sizeof(uv_write_t));
-				uv_buf_t b = { .base = resp.base, .len = resp.len };
+				uv_buf_t b = { .base = (char*)resp.base, .len = resp.len };
 				w->data = resp.base;
 
 				uv_write(w, handle, &b, 1, on_write);
@@ -62,12 +62,14 @@ void on_read(uv_stream_t* handle, ssize_t nread, const uv_buf_t* buf) {
 		else {
 			ws_data_t data;
 			int r = ws_process_frame(&data, buf->base, nread);
+			//write(1, buf->base, nread);
 
 			if(r) {
 				fprintf(stderr, "ws: %s\n", ws_err_name(r));
 				uv_close((uv_handle_t*)handle, on_close);
 			}
 			else {
+				printf("Message:");
 				write(1, data.base, data.len);
 			}
 		}
