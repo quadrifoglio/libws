@@ -11,14 +11,9 @@ int ws_process_handshake(ws_handshake_t* h, char* buf, size_t len) {
 		return WS_ERR_INVALID_REQUEST;
 	}*/
 
-	h->response = 0;
-	h->origin = 0;
-
 	char* ss = (char*)malloc(len + 1);
 	memcpy(ss, buf, len);
 	ss[len - 1] = '\0';
-
-	printf("%s\n", ss);
 
 	char* getStart = strstr(ss, "GET");
 	char* httpStart = strstr(ss, "HTTP/1.1"); // Must be HTTP/1.1 (RFC6455)
@@ -94,12 +89,14 @@ ws_frame_t ws_create_frame(ws_type_t type, char* buf, size_t len) {
 	return res;
 }
 
-char* ws_handshake_response(ws_handshake_t* h) {
-	h->responseSize = strlen(WS_HANDSHAKE_RESP) + 64;
-	h->response = (char*)malloc(h->responseSize);
+ws_data_t ws_handshake_response(ws_handshake_t* h) {
+	ws_data_t d;
 
-	sprintf(h->response, WS_HANDSHAKE_RESP, h->accept);
-	return h->response;
+	d.len = strlen(WS_HANDSHAKE_RESP) + 64;
+	d.base = (u8*)malloc(d.len);
+
+	sprintf((char*)d.base, WS_HANDSHAKE_RESP, h->accept);
+	return d;
 }
 
 void ws_handshake_done(ws_handshake_t* h) {
@@ -110,9 +107,6 @@ void ws_handshake_done(ws_handshake_t* h) {
 
 	if(h->origin) {
 		free(h->origin);
-	}
-	if(h->response) {
-		free(h->response);
 	}
 }
 

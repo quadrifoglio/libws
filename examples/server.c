@@ -28,6 +28,10 @@ void on_write(uv_write_t* w, int status) {
 		uv_close((uv_handle_t*)w->handle, on_close);
 	}
 
+	if(w->data) {
+		free(w->data);
+	}
+
 	free(w);
 }
 
@@ -45,10 +49,11 @@ void on_read(uv_stream_t* handle, ssize_t nread, const uv_buf_t* buf) {
 			}
 			else {
 				c->accepted = true;
-				char* resp = ws_handshake_response(&h);
+				ws_data_t resp = ws_handshake_response(&h);
 
 				uv_write_t* w = (uv_write_t*)malloc(sizeof(uv_write_t));
-				uv_buf_t b = { .base = resp, .len = h.responseSize };
+				uv_buf_t b = { .base = resp.base, .len = resp.len };
+				w->data = resp.base;
 
 				uv_write(w, handle, &b, 1, on_write);
 				ws_handshake_done(&h);

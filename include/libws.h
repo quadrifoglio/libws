@@ -36,9 +36,6 @@ typedef struct {
 	char* origin;
 	char* key;
 	char* accept;
-
-	char* response;
-	size_t responseSize;
 } ws_handshake_t;
 
 typedef enum {
@@ -57,7 +54,7 @@ typedef struct {
 } ws_frame_t;
 
 int ws_process_handshake(ws_handshake_t* h, char* buf, size_t len);
-char* ws_handshake_response(ws_handshake_t* h);
+ws_data_t ws_handshake_response(ws_handshake_t* h);
 void ws_handshake_done(ws_handshake_t* h);
 
 int ws_process_frame(ws_data_t* data, char* buf, size_t len);
