@@ -26,6 +26,9 @@ typedef int64_t i64;
 
 typedef struct {
 	char* url;
+	char* host;
+	char* origin;
+	char* key;
 } ws_handshake_t;
 
 typedef enum {
@@ -44,6 +47,8 @@ typedef struct {
 } ws_frame_t;
 
 int ws_process_handshake(ws_handshake_t* h, char* buf, size_t len);
+void ws_handshake_done(ws_handshake_t* h);
+
 int ws_process_frame(ws_data_t* data, char* buf, size_t len);
 ws_frame_t ws_create_frame(ws_type_t type, char* buf, size_t len);
 

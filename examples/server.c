@@ -44,6 +44,7 @@ void on_read(uv_stream_t* handle, ssize_t nread, const uv_buf_t* buf) {
 			}
 			else {
 				c->accepted = true;
+				ws_handshake_done(&h);
 			}
 		}
 		else {
