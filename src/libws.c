@@ -2,12 +2,17 @@
 
 #include <string.h>
 #include <stdio.h>
+#include "lib/sha1.h"
+#include "lib/base64.h"
 
 int ws_process_handshake(ws_handshake_t* h, char* buf, size_t len) {
 	// TODO: Remove when finished debuging
 	/*if(len < 150) {
 		return WS_ERR_INVALID_REQUEST;
 	}*/
+
+	h->response = 0;
+	h->origin = 0;
 
 	char* ss = (char*)malloc(len + 1);
 	memcpy(ss, buf, len);
@@ -49,17 +54,27 @@ int ws_process_handshake(ws_handshake_t* h, char* buf, size_t len) {
 			return WS_ERR_INVALID_REQUEST;
 		}
 
-		h->origin = wsu_get_header_value("Origin: ", ss);
-		if(h->origin == 0) {
-			free(ss);
-			return WS_ERR_INVALID_REQUEST;
-		}
-
 		h->key = wsu_get_header_value("Sec-WebSocket-Key: ", ss);
 		if(h->key == 0) {
 			free(ss);
 			return WS_ERR_INVALID_REQUEST;
 		}
+
+		h->origin = wsu_get_header_value("Origin: ", ss);
+
+		char* sc = (char*)malloc(strlen(h->key) + 36 + 1);
+		strcpy(sc, h->key);
+		strcat(sc, "258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
+
+		sha1nfo s;
+		sha1_init(&s);
+		sha1_write(&s, sc, strlen(sc));
+		u8* hash = sha1_result(&s);
+
+		h->accept = (char*)malloc(64);
+		encode64((char*)hash, h->accept, 20);
+
+		free(sc);
 	}
 	else {
 		free(ss);
@@ -79,11 +94,26 @@ ws_frame_t ws_create_frame(ws_type_t type, char* buf, size_t len) {
 	return res;
 }
 
+char* ws_handshake_response(ws_handshake_t* h) {
+	h->responseSize = strlen(WS_HANDSHAKE_RESP) + 64;
+	h->response = (char*)malloc(h->responseSize);
+
+	sprintf(h->response, WS_HANDSHAKE_RESP, h->accept);
+	return h->response;
+}
+
 void ws_handshake_done(ws_handshake_t* h) {
 	free(h->url);
 	free(h->host);
-	free(h->origin);
 	free(h->key);
+	free(h->accept);
+
+	if(h->origin) {
+		free(h->origin);
+	}
+	if(h->response) {
+		free(h->response);
+	}
 }
 
 const char* ws_err_name(int r) {

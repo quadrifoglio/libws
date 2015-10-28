@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <string.h>
 
 #include "libws.h"
 
@@ -44,6 +45,12 @@ void on_read(uv_stream_t* handle, ssize_t nread, const uv_buf_t* buf) {
 			}
 			else {
 				c->accepted = true;
+				char* resp = ws_handshake_response(&h);
+
+				uv_write_t* w = (uv_write_t*)malloc(sizeof(uv_write_t));
+				uv_buf_t b = { .base = resp, .len = h.responseSize };
+
+				uv_write(w, handle, &b, 1, on_write);
 				ws_handshake_done(&h);
 			}
 		}
@@ -59,11 +66,6 @@ void on_read(uv_stream_t* handle, ssize_t nread, const uv_buf_t* buf) {
 				write(1, data.base, data.len);
 			}
 		}
-
-		/*uv_write_t* w = (uv_write_t*)malloc(sizeof(uv_write_t));
-
-		uv_buf_t b = { .base = "mdr\n", .len = 4 };
-		uv_write(w, handle, &b, 1, on_write);*/
 	}
 	else {
 		uv_close((uv_handle_t*)handle, on_close);

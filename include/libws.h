@@ -12,6 +12,12 @@
 #define WS_NO_ERR 0
 #define WS_ERR_INVALID_REQUEST 1
 
+#define WS_HANDSHAKE_RESP \
+	"HTTP/1.1 101 Switching Protocols\r\n" \
+	"Upgrade: websocket\r\n" \
+	"Connection: Upgrade\r\n" \
+	"Sec-WebSocket-Accept: %s\r\n\r\n" \
+
 typedef uint8_t bool;
 
 typedef uint8_t u8;
@@ -29,6 +35,10 @@ typedef struct {
 	char* host;
 	char* origin;
 	char* key;
+	char* accept;
+
+	char* response;
+	size_t responseSize;
 } ws_handshake_t;
 
 typedef enum {
@@ -47,6 +57,7 @@ typedef struct {
 } ws_frame_t;
 
 int ws_process_handshake(ws_handshake_t* h, char* buf, size_t len);
+char* ws_handshake_response(ws_handshake_t* h);
 void ws_handshake_done(ws_handshake_t* h);
 
 int ws_process_frame(ws_data_t* data, char* buf, size_t len);
