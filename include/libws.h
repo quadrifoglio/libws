@@ -53,6 +53,7 @@ typedef struct {
 
 typedef struct {
 	u8 type;
+	bool fin;
 	ws_data_t data;
 } ws_frame_t;
 
@@ -60,9 +61,10 @@ int ws_process_handshake(ws_handshake_t* h, char* buf, size_t len);
 ws_data_t ws_handshake_response(ws_handshake_t* h);
 void ws_handshake_done(ws_handshake_t* h);
 
-int ws_process_frame(ws_data_t* data, char* buf, size_t len);
-ws_frame_t ws_create_frame(ws_type_t type, char* buf, size_t len);
+int ws_process_frame(ws_frame_t* f, char* buf, size_t len);
+ws_data_t ws_create_frame(u8 type, char* buf, size_t len);
 
 const char* ws_err_name(int r);
 
 char* wsu_get_header_value(const char* hd, char* start);
+void wsu_dump_frame(ws_frame_t* f);
