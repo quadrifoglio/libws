@@ -9,8 +9,16 @@
 #define WS_CR 0x0d
 #define Ws_LF 0x0a
 
+#define WS_FRAME_CONTINUATION 0x0
+#define WS_FRAME_TEXT 0x1
+#define WS_FRAME_BINARY 0x2
+#define WS_FRAME_CLOSE 0x8
+#define WS_FRAME_PING 0x9
+#define WS_FRAME_PONG 0x
+
 #define WS_NO_ERR 0
 #define WS_ERR_INVALID_REQUEST 1
+#define WS_ERR_INVALID_FRAME 2
 
 #define WS_HANDSHAKE_RESP \
 	"HTTP/1.1 101 Switching Protocols\r\n" \
@@ -38,18 +46,13 @@ typedef struct {
 	char* accept;
 } ws_handshake_t;
 
-typedef enum {
-	WS_TEXT_FRAME,
-	WS_DATA_FRAME
-} ws_type_t;
-
 typedef struct {
 	u8* base;
 	size_t len;
 } ws_data_t;
 
 typedef struct {
-	ws_type_t type;
+	u8 type;
 	ws_data_t data;
 } ws_frame_t;
 

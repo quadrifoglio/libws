@@ -88,41 +88,61 @@ int ws_process_handshake(ws_handshake_t* h, char* buf, size_t len) {
 
 int ws_process_frame(ws_data_t* data, char* buf, size_t len) {
 	int cursor = 0;
+	u64 length = 0;
 	u8 mask[4];
 
-	bool fin = buf[cursor] & 0x80 >> 7;
+	bool fin = (buf[cursor] & 0x80) != 0;
 	u8 opcode = buf[cursor] & 0x0f;
 	cursor++;
 
-	bool masked = buf[cursor] & 0x80 >> 7;
+	bool masked = (buf[cursor] & 0x80) != 0;
 	u8 plen = buf[cursor] & 0x7f;
 	cursor++;
 
-	printf("Size: %lu // Fin: %d // Opcode: %d // Masked: %d // plen(1): %d\n", len, fin, opcode, masked, plen);
+	if(plen <= 125) {
+		length = plen;
+	}
+	else if(plen == 126 && len > (size_t)cursor + 2) {
+		length = (u8)buf[cursor] << 8 | (u8)buf[cursor+1] << 0;
+		cursor += 2;
+	}
+	else if(plen == 127 && len > (size_t)cursor + 8) {
+		length = (u8)buf[cursor] << 56 | (u8)buf[cursor + 1] << 48 |
+			(u8)buf[cursor + 2] << 40 | (u8)buf[cursor + 3] << 32 |
+			(u8)buf[cursor + 4]  << 24 | (u8)buf[cursor + 5] << 16 |
+			(u8)buf[cursor + 6] << 8 | (u8)buf[cursor + 7] << 0;
 
-	// TODO: Handle plen > 125 
+		cursor += 8;
+	}
+	else {
+		return WS_ERR_INVALID_FRAME;
+	}
 
 	if(masked && len > (size_t)cursor + 4) {
 		memcpy(mask, buf + cursor, 4);
 		cursor += 4;
 	}
 	else {
-		// Invalid
+		return WS_ERR_INVALID_FRAME;
 	}
 
-	data->base = (u8*)malloc(plen);
-	data->len = plen;
+	if(len - cursor == length) {
+		data->base = (u8*)malloc(plen);
+		data->len = length;
 
-	if(masked) {
-		for(int i = 0; i < plen; ++i) {
-			data->base[i] = (u8)(buf[cursor + i] ^ mask[i % 4]);
+		if(masked) {
+			for(int i = 0; (u64)i < length; ++i) {
+				data->base[i] = (u8)(buf[cursor + i] ^ mask[i % 4]);
+			}
 		}
-	}
-	else {
-		memcpy(data->base, buf + cursor, plen);
+		else {
+			memcpy(data->base, buf + cursor, length);
+		}
+
+		return WS_NO_ERR;
 	}
 
-	return WS_NO_ERR;
+	return WS_ERR_INVALID_FRAME;
 }
 
 ws_frame_t ws_create_frame(ws_type_t type, char* buf, size_t len) {
@@ -164,6 +184,8 @@ const char* ws_err_name(int r) {
 			return "no error";
 		case WS_ERR_INVALID_REQUEST:
 			return "invalid opening handshake";
+		case WS_ERR_INVALID_FRAME:
+			return "invalid websocket frame";
 		default:
 			return "unknown error";
 	}
