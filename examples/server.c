@@ -11,6 +11,11 @@ typedef struct {
 	bool accepted;
 } client_t;
 
+typedef struct {
+	uv_write_t w;
+	uv_buf_t buf;
+} write_req_t;
+
 static uv_loop_t* loop;
 
 void on_alloc(uv_handle_t* handle, size_t size, uv_buf_t* buf) {
@@ -28,10 +33,9 @@ void on_write(uv_write_t* w, int status) {
 		uv_close((uv_handle_t*)w->handle, on_close);
 	}
 
-	if(w->data) {
-		free(w->data);
-	}
+	write_req_t* wr = (write_req_t*)w;
 
+	free(wr->buf.base);
 	free(w);
 }
 
@@ -51,12 +55,14 @@ void on_read(uv_stream_t* handle, ssize_t nread, const uv_buf_t* buf) {
 				c->accepted = true;
 				ws_data_t resp = ws_handshake_response(&h);
 
-				uv_write_t* w = (uv_write_t*)malloc(sizeof(uv_write_t));
-				uv_buf_t b = { .base = (char*)resp.base, .len = resp.len };
-				w->data = resp.base;
+				write_req_t* wr = (write_req_t*)malloc(sizeof(write_req_t));
+				wr->buf = uv_buf_init((char*)malloc(resp.len), resp.len);
+				memcpy(wr->buf.base, resp.base, resp.len);
 
-				uv_write(w, handle, &b, 1, on_write);
+				uv_write((uv_write_t*)wr, handle, &wr->buf, 1, on_write);
+
 				ws_handshake_done(&h);
+				ws_data_done(&resp);
 			}
 		}
 		else {
@@ -71,11 +77,14 @@ void on_read(uv_stream_t* handle, ssize_t nread, const uv_buf_t* buf) {
 				wsu_dump_frame(&f);
 
 				ws_data_t resp = ws_create_frame(WS_FRAME_TEXT, "yo", 2);
-				uv_write_t* w = (uv_write_t*)malloc(sizeof(uv_write_t));
-				uv_buf_t b = { .base = (char*)resp.base, .len = resp.len };
-				w->data = resp.base;
 
-				uv_write(w, handle, &b, 1, on_write);
+				write_req_t* wr = (write_req_t*)malloc(sizeof(write_req_t));
+				wr->buf = uv_buf_init((char*)malloc(resp.len), resp.len);
+				memcpy(wr->buf.base, resp.base, resp.len);
+
+				uv_write((uv_write_t*)wr, handle, &wr->buf, 1, on_write);
+
+				ws_data_done(&resp);
 			}
 		}
 	}
@@ -94,6 +103,9 @@ void on_connect(uv_stream_t* serv, int status) {
 
 	uv_tcp_t* handle = (uv_tcp_t*)malloc(sizeof(uv_tcp_t));
 	handle->data = (client_t*)malloc(sizeof(client_t));
+
+	client_t* c = (client_t*)handle->data;
+	c->accepted = false;
 
 	int r = uv_tcp_init(loop, handle);
 	if(r) {

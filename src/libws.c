@@ -127,7 +127,7 @@ int ws_process_frame(ws_frame_t* f, char* buf, size_t len) {
 	}
 
 	if(len - cursor == length) {
-		f->data.base = (u8*)malloc(plen);
+		f->data.base = (u8*)malloc(length);
 		f->data.len = length;
 
 		if(masked) {
@@ -211,6 +211,8 @@ ws_data_t ws_handshake_response(ws_handshake_t* h) {
 	d.base = (u8*)malloc(d.len);
 
 	sprintf((char*)d.base, WS_HANDSHAKE_RESP, h->accept);
+	d.len = strlen((char*)d.base);
+
 	return d;
 }
 
@@ -232,6 +234,15 @@ void ws_handshake_done(ws_handshake_t* h) {
 	}
 }
 
+ws_data_t ws_data_nit(u8* base, size_t len) {
+	ws_data_t res = { base, len };
+	return res;
+}
+
+void ws_data_done(ws_data_t* d) {
+	free(d->base);
+}
+
 const char* ws_err_name(int r) {
 	switch(r) {
 		case WS_NO_ERR:
@@ -247,8 +258,12 @@ const char* ws_err_name(int r) {
 
 char* wsu_get_header_value(const char* hd, char* str) {
 	char* start = strstr(str, hd);
+	if(start == 0) {
+		return 0;
+	}
+
 	char* endlStart = strstr(start, "\r\n");
-	if(start == 0 || endlStart == 0) {
+	if(endlStart == 0) {
 		return 0;
 	}
 
@@ -261,14 +276,14 @@ char* wsu_get_header_value(const char* hd, char* str) {
 }
 
 void wsu_dump_frame(ws_frame_t* f) {
-	char* s = (char*)malloc(f->data.len + 1);
+	char* s = (char*)malloc(f->data.len + 2);
 	memcpy(s, f->data.base, f->data.len);
 	s[f->data.len] = '\0';
 
 	printf("-- Frame --\n");
 	printf("Type           : |%d|\n", f->type);
 	printf("Fin            : |%d|\n", f->fin);
-	printf("Payload length : |%d|\n", f->data.len);
+	printf("Payload length : |%zu|\n", f->data.len);
 	printf("Payload        : |%s|\n", s);
 	printf("-- End --\n");
 
