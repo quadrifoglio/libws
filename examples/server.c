@@ -71,8 +71,6 @@ void on_read(uv_stream_t* handle, ssize_t nread, const uv_buf_t* buf) {
 				uv_close((uv_handle_t*)handle, on_close);
 			}
 			else {
-				wsu_dump_frame(&f);
-
 				ws_data_t resp = ws_create_frame(WS_FRAME_TEXT, "yo", 2);
 				write_req_t* wr = (write_req_t*)malloc(sizeof(write_req_t));
 				wr->buf = uv_buf_init((char*)resp.base, resp.len);

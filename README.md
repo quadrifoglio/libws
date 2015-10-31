@@ -14,6 +14,8 @@ if(err) {
 	// Handle error
 }
 else {
+	printf("Client connected to URL \"%s\" from origin \"%s\"\n", h.url, h.origin);
+
 	ws_data_t response = ws_handshake_response(&h);
 	// Send the response data (response.base, response.len)
 }
@@ -35,4 +37,13 @@ else {
 }
 
 free(msg.base);
+```
+
+To send a WebSocket message, do the following:
+
+```c
+char* data = "Hello WebSocket Client !";
+ws_data_t frame = ws_create_frame(WS_FRAME_TEXT, data, strlen(data));
+
+// Then send the frame to the connection (frame.base, frame.len).
 ```
