@@ -56,13 +56,10 @@ void on_read(uv_stream_t* handle, ssize_t nread, const uv_buf_t* buf) {
 				ws_data_t resp = ws_handshake_response(&h);
 
 				write_req_t* wr = (write_req_t*)malloc(sizeof(write_req_t));
-				wr->buf = uv_buf_init((char*)malloc(resp.len), resp.len);
-				memcpy(wr->buf.base, resp.base, resp.len);
+				wr->buf = uv_buf_init((char*)resp.base, resp.len);
 
 				uv_write((uv_write_t*)wr, handle, &wr->buf, 1, on_write);
-
 				ws_handshake_done(&h);
-				ws_data_done(&resp);
 			}
 		}
 		else {
@@ -77,14 +74,10 @@ void on_read(uv_stream_t* handle, ssize_t nread, const uv_buf_t* buf) {
 				wsu_dump_frame(&f);
 
 				ws_data_t resp = ws_create_frame(WS_FRAME_TEXT, "yo", 2);
-
 				write_req_t* wr = (write_req_t*)malloc(sizeof(write_req_t));
-				wr->buf = uv_buf_init((char*)malloc(resp.len), resp.len);
-				memcpy(wr->buf.base, resp.base, resp.len);
+				wr->buf = uv_buf_init((char*)resp.base, resp.len);
 
 				uv_write((uv_write_t*)wr, handle, &wr->buf, 1, on_write);
-
-				ws_data_done(&resp);
 			}
 		}
 	}
