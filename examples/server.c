@@ -1,147 +1,98 @@
-#include <uv.h>
-
-#include <stdlib.h>
 #include <stdio.h>
-#include <unistd.h>
+#include <stdlib.h>
+#include <errno.h>
 #include <string.h>
+#include <libmill.h>
 
 #include "libws.h"
 
-typedef struct {
-	bool accepted;
-} client_t;
+ws_data_t get_handshake_request(tcpsock sock) {
+	ws_data_t data;
+	data.base = malloc(1);
+	data.len = 1;
+	size_t cur = 0;
 
-typedef struct {
-	uv_write_t w;
-	uv_buf_t buf;
-} write_req_t;
+	i64 dl = now() + 2000;
+	do {
+		u8 buf[256];
+		size_t received = tcprecvuntil(sock, buf, 256, "\r", 1, dl);
+		if(received == 0) {
+			break;
+		}
 
-static uv_loop_t* loop;
+		data.base = realloc(data.base, data.len + received);
+		memcpy(data.base + cur, buf, received);
 
-void on_alloc(uv_handle_t* handle, size_t size, uv_buf_t* buf) {
-	buf->base = malloc(size);
-	buf->len = size;
+		cur += received;
+		data.len += received;
+		dl = now() + 5;
+	} while(1);
+
+	return data;
 }
 
-void on_close(uv_handle_t* handle) {
-	free(handle->data);
-	free(handle);
-}
-
-void on_write(uv_write_t* w, int status) {
-	if(status < 0) {
-		uv_close((uv_handle_t*)w->handle, on_close);
+coroutine void client(tcpsock sock) {
+	ws_data_t d = get_handshake_request(sock);
+	if(d.len < 30) {
+		fputs("Invalid handshake request", stderr);
+		goto cleanup;
 	}
 
-	write_req_t* wr = (write_req_t*)w;
-
-	free(wr->buf.base);
-	free(w);
-}
-
-void on_read(uv_stream_t* handle, ssize_t nread, const uv_buf_t* buf) {
-	if(nread >= 0) {
-		client_t* c = (client_t*)handle->data;
-
-		if(!c->accepted) {
-			ws_handshake_t h;
-			int r = ws_process_handshake(&h, buf->base, nread);
-
-			if(r) {
-				fprintf(stderr, "ws: %s\n", ws_err_name(r));
-				uv_close((uv_handle_t*)handle, on_close);
-			}
-			else {
-				c->accepted = true;
-				ws_data_t resp = ws_handshake_response(&h);
-
-				write_req_t* wr = (write_req_t*)malloc(sizeof(write_req_t));
-				wr->buf = uv_buf_init((char*)resp.base, resp.len);
-
-				uv_write((uv_write_t*)wr, handle, &wr->buf, 1, on_write);
-				ws_handshake_done(&h);
-			}
-		}
-		else {
-			ws_frame_t f;
-			int r = ws_process_frame(&f, buf->base, nread);
-
-			if(r) {
-				fprintf(stderr, "ws: %s\n", ws_err_name(r));
-				uv_close((uv_handle_t*)handle, on_close);
-			}
-			else {
-				ws_data_t resp = ws_create_frame(WS_FRAME_TEXT, "yo", 2);
-				write_req_t* wr = (write_req_t*)malloc(sizeof(write_req_t));
-				wr->buf = uv_buf_init((char*)resp.base, resp.len);
-
-				uv_write((uv_write_t*)wr, handle, &wr->buf, 1, on_write);
-			}
-		}
+	ws_handshake_t hs;
+	int r = ws_process_handshake(&hs, (char*)d.base, d.len);
+	if(r) {
+		fputs("Invalid handshake request", stderr);
+		goto cleanup;
 	}
 	else {
-		uv_close((uv_handle_t*)handle, on_close);
+		//printf("Client connected to URL \"%s\" from origin \"%s\"\n", hs.url, hs.origin);
+
+		ws_data_t response = ws_handshake_response(&hs);
+		tcpsend(sock, response.base, response.len, -1);
+		tcpflush(sock, -1);
+
+		ws_handshake_done(&hs);
+
+		while(1) {
+			u8 buf[256];
+			size_t received = tcprecv(sock, buf, 256, -1);
+			if(received != 0) {
+				ws_frame_t msg;
+				r = ws_process_frame(&msg, (char*)buf, received);
+
+				wsu_dump_frame(&msg);
+				free(msg.data.base);
+			}
+		}
 	}
 
-	free(buf->base);
+	cleanup:
+	free(d.base);
+	tcpclose(sock);
 }
 
-void on_connect(uv_stream_t* serv, int status) {
-	if(status < 0) {
-		fprintf(stderr, "on_connect: %s\n", uv_err_name(status));
-		return;
+int main(int argc, char** argv) {
+	int port = 8000;
+	if(argc > 1) {
+		port = atoi(argv[1]);
 	}
 
-	uv_tcp_t* handle = (uv_tcp_t*)malloc(sizeof(uv_tcp_t));
-	handle->data = (client_t*)malloc(sizeof(client_t));
-
-	client_t* c = (client_t*)handle->data;
-	c->accepted = false;
-
-	int r = uv_tcp_init(loop, handle);
-	if(r) {
-		fprintf(stderr, "handle init: %s\n", uv_err_name(r));
-		return;
-	}
-
-	r = uv_accept(serv, (uv_stream_t*)handle);
-	if(r) {
-		fprintf(stderr, "accept: %s\n", uv_err_name(r));
-		return;
-	}
-
-	r = uv_read_start((uv_stream_t*)handle, on_alloc, on_read);
-	if(r) {
-		fprintf(stderr, "read_start: %s\n", uv_err_name(r));
-		return;
-	}
-}
-
-int main(void) {
-	loop = uv_default_loop();
-	uv_tcp_t serv;
-
-	int r = uv_tcp_init(loop, &serv);
-	if(r) {
-		fprintf(stderr, "init: %s\n", uv_err_name(r));
+	ipaddr addr = iplocal(0, port, 0);
+	tcpsock tcp = tcplisten(addr, 10);
+	if(!tcp) {
+		fprintf(stderr, "Failed to bind to port %d (errno %d)\n", port, errno);
 		return 1;
 	}
 
-	struct sockaddr_in addr;
-	uv_ip4_addr("0.0.0.0", 8000, &addr);
+	while(1) {
+		tcpsock sock = tcpaccept(tcp, -1);
+		if(!sock) {
+			fprintf(stderr, "Connection lost (errno %d)\n", errno);
+			continue;
+		}
 
-	r = uv_tcp_bind(&serv, (const struct sockaddr_in*)&addr, 0);
-	if(r) {
-		fprintf(stderr, "bind: %s\n", uv_err_name(r));
-		return 1;
+		go(client(sock));
 	}
 
-	r = uv_listen((uv_stream_t*)&serv, 2, on_connect);
-	if(r) {
-		fprintf(stderr, "listen: %s\n", uv_err_name(r));
-		return 1;
-	}
-
-	uv_run(loop, UV_RUN_DEFAULT);
 	return 0;
 }

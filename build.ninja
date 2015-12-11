@@ -3,7 +3,7 @@ cflags = -Iinclude -g -Wall -Wextra -Wno-unused-parameter
 
 ld = clang
 ldflags = 
-libs = -luv
+libs = -lmill
 
 src = src
 exp = examples
