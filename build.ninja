@@ -1,28 +1,15 @@
 cc = clang
-cflags = -Iinclude -g -Wall -Wextra -Wno-unused-parameter
-
-ld = clang
-ldflags = 
-libs = -lmill
-
-src = src
-exp = examples
-dst = build
+cflags = -I. -g -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers
 
 rule cc
   command = $cc -c $cflags -o $out $in
   description = CC $in
 
 rule ld
-  command = $ld $ldflags -o $out $in $libs
+  command = $cc $ldflags -o $out $in
   description = LD $in
 
-rule ar
-  command = ar rcs $out $in
-  description = AR $in
+build build/ws.o: cc ws.c
 
-build $dst/libws.o: cc $src/libws.c
-build $dst/libws.a: ar $dst/libws.o
-
-build $dst/server.o: cc $exp/server.c
-build $dst/server: ld $dst/server.o $dst/libws.a
+build build/server.o: cc examples/server.c
+build build/server: ld build/server.o build/ws.o

@@ -1,98 +1,89 @@
+#include "ws.h"
+
 #include <stdio.h>
-#include <stdlib.h>
-#include <errno.h>
 #include <string.h>
-#include <libmill.h>
+#include <netinet/in.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <signal.h>
+#include <unistd.h>
 
-#include "libws.h"
+void client(int csfd) {
+	ws_handshake_t h;
+	int err = ws_handshake_process(&h, csfd);
+	if(err) {
+		fputs("process_handshake: failed", stderr);
+		goto cleanup;
+	}
 
-ws_data_t get_handshake_request(tcpsock sock) {
-	ws_data_t data;
-	data.base = malloc(1);
-	data.len = 1;
-	size_t cur = 0;
+	ws_data_t response = ws_handshake_response(&h);
+	send(csfd, response.base, response.len, 0);
 
-	i64 dl = now() + 2000;
-	do {
-		u8 buf[256];
-		size_t received = tcprecvuntil(sock, buf, 256, "\r", 1, dl);
-		if(received == 0) {
+	while(true) {
+		ws_frame_t msg;
+
+		int err = ws_frame_process(&msg, csfd);
+		if(err) {
+			fputs("process_frame: failed", stderr);
 			break;
 		}
 
-		data.base = realloc(data.base, data.len + received);
-		memcpy(data.base + cur, buf, received);
+		free(msg.data.base);
+	}
 
-		cur += received;
-		data.len += received;
-		dl = now() + 5;
-	} while(1);
-
-	return data;
+cleanup:
+	ws_handshake_done(&h);
+	shutdown(csfd, SHUT_RDWR);
+	close(csfd);
 }
 
-coroutine void client(tcpsock sock) {
-	ws_data_t d = get_handshake_request(sock);
-	if(d.len < 30) {
-		fputs("Invalid handshake request", stderr);
-		goto cleanup;
-	}
-
-	ws_handshake_t hs;
-	int r = ws_process_handshake(&hs, (char*)d.base, d.len);
-	if(r) {
-		fputs("Invalid handshake request", stderr);
-		goto cleanup;
-	}
-	else {
-		//printf("Client connected to URL \"%s\" from origin \"%s\"\n", hs.url, hs.origin);
-
-		ws_data_t response = ws_handshake_response(&hs);
-		tcpsend(sock, response.base, response.len, -1);
-		tcpflush(sock, -1);
-
-		ws_handshake_done(&hs);
-
-		while(1) {
-			u8 buf[256];
-			size_t received = tcprecv(sock, buf, 256, -1);
-			if(received != 0) {
-				ws_frame_t msg;
-				r = ws_process_frame(&msg, (char*)buf, received);
-
-				wsu_dump_frame(&msg);
-				free(msg.data.base);
-			}
-		}
-	}
-
-	cleanup:
-	free(d.base);
-	tcpclose(sock);
+void sigint() {
+	exit(0);
 }
 
 int main(int argc, char** argv) {
-	int port = 8000;
+	signal(SIGINT, sigint);
+
+	int nproc = 1;
 	if(argc > 1) {
-		port = atoi(argv[1]);
+		nproc = atoi(argv[1]);
 	}
 
-	ipaddr addr = iplocal(0, port, 0);
-	tcpsock tcp = tcplisten(addr, 10);
-	if(!tcp) {
-		fprintf(stderr, "Failed to bind to port %d (errno %d)\n", port, errno);
+	int sockfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if(sockfd == -1) {
+		perror("socket");
 		return 1;
 	}
 
-	while(1) {
-		tcpsock sock = tcpaccept(tcp, -1);
-		if(!sock) {
-			fprintf(stderr, "Connection lost (errno %d)\n", errno);
+	struct sockaddr_in sa = {0};
+	sa.sin_family = AF_INET;
+	sa.sin_port = htons(8000);
+	sa.sin_addr.s_addr = htonl(INADDR_ANY);
+
+	setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, 0, 0);
+
+	if(bind(sockfd, (struct sockaddr *)&sa, sizeof(sa)) != 0) {
+		perror("bind");
+		return 1;
+	}
+
+	if(listen(sockfd, 1) != 0) {
+		perror("listen");
+		return 1;
+	}
+
+	while(true) {
+		int csfd = accept(sockfd, 0, 0);
+		if(csfd == -1) {
+			perror("accept");
 			continue;
 		}
 
-		go(client(sock));
+		client(csfd);
 	}
+
+	shutdown(sockfd, 2);
+	close(sockfd);
 
 	return 0;
 }

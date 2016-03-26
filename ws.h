@@ -57,17 +57,17 @@ typedef struct {
 	ws_data_t data;
 } ws_frame_t;
 
-int ws_process_handshake(ws_handshake_t* h, char* buf, size_t len);
-ws_data_t ws_handshake_response(ws_handshake_t* h);
-void ws_handshake_done(ws_handshake_t* h);
+int          ws_handshake_process(ws_handshake_t* h, int sock);
+ws_data_t    ws_handshake_response(ws_handshake_t* h);
+void         ws_handshake_done(ws_handshake_t* h);
 
-int ws_process_frame(ws_frame_t* f, char* buf, size_t len);
-ws_data_t ws_create_frame(u8 type, char* buf, size_t len);
+int          ws_frame_process(ws_frame_t* f, int sock);
+ws_data_t    ws_frame_create(u8 type, char* buf, size_t len);
 
-ws_data_t ws_data_nit(u8* base, size_t len);
-void ws_data_done(ws_data_t* d);
+ws_data_t    ws_data_nit(u8* base, size_t len);
+void         ws_data_done(ws_data_t* d);
 
-const char* ws_err_name(int r);
+const char*  ws_err_name(int r);
 
-char* wsu_get_header_value(const char* hd, char* start);
-void wsu_dump_frame(ws_frame_t* f);
+char*        wsu_get_header_value(const char* hd, char* start);
+void         wsu_dump_frame(ws_frame_t* f);
