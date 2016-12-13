@@ -1,5 +1,4 @@
-build/
+bin/
 
 *.swp
 *.swo
-.ninja*
