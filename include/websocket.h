@@ -4,7 +4,7 @@
 #include <sys/types.h>
 
 /*
- * Public API functionality
+ * -- Public API functionality
  */
 
 struct wsStatus {
@@ -24,9 +24,16 @@ int wsHandshake(int sockfd, struct wsStatus* status);
  */
 void wsStatusFree(const struct wsStatus* s);
 
+
+
 /*
- * Internal utility functionality
+ * -- Internal utility functionality
  */
 
 ssize_t wsReadLine(int sockfd, void* buf, size_t len);
 int wsRegexMatches(const char* regex, const char* str, char** matches);
+
+/*
+ * Encoding/hashing
+ */
+char* wsB64(const char* data, size_t len, size_t* outLen);
