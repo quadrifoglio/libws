@@ -52,6 +52,11 @@ void wsStatusFree(const struct wsStatus* s);
 int wsRecv(int sockfd, struct wsMessage* msg);
 
 /*
+ * Send a WebSocket message
+ */
+int wsSend(int sockfd, int type, void* buf, size_t len);
+
+/*
  * Free the resources associated
  * with a wsMessage struct
  */

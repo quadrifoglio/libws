@@ -293,3 +293,56 @@ int wsRecv(int sockfd, struct wsMessage* msg) {
 void wsMessageFree(const struct wsMessage* msg) {
 	free(msg->payload);
 }
+
+int wsSend(int sockfd, int type, void* buf, size_t len) {
+	char b[2];
+	b[0] = 0x80 | (0x0f & type);
+
+	if(send(sockfd, b, 1, 0) != 1) {
+		return 0;
+	}
+
+	if(len < 126) {
+		b[1] = (char)len;
+
+		if(send(sockfd, b + 1, 1, 0) != 1) {
+			return 0;
+		}
+	}
+	else if(len < 65536) {
+		b[1] = 126;
+
+		if(send(sockfd, b + 1, 1, 0) != 1) {
+			return 0;
+		}
+
+		char* l = unpack(2, len);
+		if(send(sockfd, l, 2, 0) != 2) {
+			free(l);
+			return 0;
+		}
+
+		free(l);
+	}
+	else {
+		b[1] = 127;
+
+		if(send(sockfd, b + 1, 1, 0) != 1) {
+			return 0;
+		}
+
+		char* l = unpack(8, len);
+		if(send(sockfd, l, 8, 0) != 8) {
+			free(l);
+			return 0;
+		}
+
+		free(l);
+	}
+
+	if(send(sockfd, buf, len, 0) != (ssize_t)len) {
+		return 0;
+	}
+
+	return 1;
+}

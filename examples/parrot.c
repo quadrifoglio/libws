@@ -1,3 +1,4 @@
+#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -72,12 +73,10 @@ int main(int argc, char** argv) {
 
 		struct wsMessage msg = {0};
 		while(wsRecv(clientfd, &msg)) {
-			char* str = calloc(1, msg.len + 1);
-			memcpy(str, msg.payload, msg.len);
+			if(!wsSend(clientfd, WS_OPCODE_FRAME_TEXT, msg.payload, msg.len)) {
+				fputs("Failed to send message", stderr);
+			}
 
-			puts(str);
-
-			free(str);
 			wsMessageFree(&msg);
 		}
 	}
