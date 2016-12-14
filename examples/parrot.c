@@ -69,6 +69,17 @@ int main(int argc, char** argv) {
 		}
 
 		printf("WebSocket connection on %s using protocol version %d\n", status.url, status.version);
+
+		struct wsMessage msg = {0};
+		while(wsRecv(clientfd, &msg)) {
+			char* str = calloc(1, msg.len + 1);
+			memcpy(str, msg.payload, msg.len);
+
+			puts(str);
+
+			free(str);
+			wsMessageFree(&msg);
+		}
 	}
 
 	close(sockfd);
