@@ -29,7 +29,7 @@ char* unpack(int n, uint64_t v) {
 
 	int index = 0;
 	for(int i = n; i > 0; --i) {
-		buf[index++] = (char)(v >> (8 * i)) & 0xff;
+		buf[index++] = (char)((v >> (8 * i)) & 0xff);
 	}
 
 	return buf;
@@ -294,50 +294,46 @@ void wsMessageFree(const struct wsMessage* msg) {
 	free(msg->payload);
 }
 
-int wsSend(int sockfd, int type, void* buf, size_t len) {
-	char b[2];
-	b[0] = 0x80 | (0x0f & type);
+int wsSend(int sockfd, int type, const void* buf, size_t len) {
+	char b = 0x80 | (0x0f & type);
 
-	if(send(sockfd, b, 1, 0) != 1) {
+	if(send(sockfd, &b, 1, 0) != 1) {
 		return 0;
 	}
 
 	if(len < 126) {
-		b[1] = (char)len;
-
-		if(send(sockfd, b + 1, 1, 0) != 1) {
+		b = (char)len;
+		if(send(sockfd, &b, 1, 0) != 1) {
 			return 0;
 		}
 	}
-	else if(len < 65536) {
-		b[1] = 126;
+	else if(len < 65535) {
+		uint8_t l[3] = {
+			126,
+			(len >> 8) & 0xff,
+			len & 0xff
+		};
 
-		if(send(sockfd, b + 1, 1, 0) != 1) {
+		if(send(sockfd, l, 3, 0) != 3) {
 			return 0;
 		}
-
-		char* l = unpack(2, len);
-		if(send(sockfd, l, 2, 0) != 2) {
-			free(l);
-			return 0;
-		}
-
-		free(l);
 	}
 	else {
-		b[1] = 127;
+		uint8_t l[9] = {
+			127,
+			(len >> 56) & 0xff,
+			(len >> 48) & 0xff,
+			(len >> 40) & 0xff,
+			(len >> 32) & 0xff,
+			(len >> 24) & 0xff,
+			(len >> 16) & 0xff,
+			(len >>  8) & 0xff,
+			(len >>  0) & 0xff
+		};
 
-		if(send(sockfd, b + 1, 1, 0) != 1) {
+		if(send(sockfd, l, 9, 0) != 9) {
 			return 0;
 		}
-
-		char* l = unpack(8, len);
-		if(send(sockfd, l, 8, 0) != 8) {
-			free(l);
-			return 0;
-		}
-
-		free(l);
 	}
 
 	if(send(sockfd, buf, len, 0) != (ssize_t)len) {
